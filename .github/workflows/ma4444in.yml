@@ -1,0 +1,71 @@
+name: Build PicoTorrent
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        arch: [x86, x64]
+        os: [windows-latest]
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Synchronize submodules
+      - name: Synchronize submodules
+        run: |
+          git submodule sync
+          git submodule update --init --recursive
+
+      # Step 3: Install and bootstrap vcpkg
+      - name: Install and bootstrap vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git vendor/vcpkg
+          vendor/vcpkg/bootstrap-vcpkg.bat
+
+      # Step 4: Install dependencies with vcpkg
+      - name: Install dependencies with vcpkg
+        run: |
+          vendor/vcpkg/vcpkg install fmt:${{ matrix.arch == 'x86' && 'x86-windows-static-md-rel' || 'x64-windows-static-md-rel' }}
+
+      # Step 5: Set up CMake
+      - name: Set up CMake
+        uses: actions/setup-cmake@v3
+
+      # Step 6: Set up Visual Studio
+      - name: Set up Visual Studio
+        uses: actions/setup-msbuild@v1
+
+      # Step 7: Configure CMake
+      - name: Configure CMake
+        run: cmake -B build -A ${{ matrix.arch == 'x86' && 'Win32' || 'x64' }} -DCMAKE_TOOLCHAIN_FILE=vendor/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      # Step 8: Build the project
+      - name: Build with CMake
+        run: cmake --build build --config Release
+
+      # Step 9: Upload build artifacts (only if the build succeeds)
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoTorrent-${{ matrix.arch }}
+          path: build/Release/**
+
+      # Step 10: Upload logs if the build fails
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.arch }}
+          path: build/CMakeFiles/CMakeOutput.log
