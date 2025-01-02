@@ -1,39 +1,60 @@
-name: CI
+name: Build PicoTorrent
+
 on:
-  pull_request:
   push:
     branches:
-      - feature/**
-      - master
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  build:
-    name: Build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        arch: [x86, x64]
-        os: [windows-latest]
+  build-x86:
+    runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Git
-        run: |
-          git fetch --prune --unshallow
-          git submodule update --init --recursive
+      - name: Set up CMake
+        uses: actions/setup-cmake@v3
 
-      - name: Restore .NET tools
-        run: dotnet tool restore
+      - name: Set up Visual Studio
+        uses: actions/setup-msbuild@v1
 
-      - name: Build
-        run: dotnet cake --platform=${{ matrix.arch }} --target=Publish --vcpkg-triplet=${{ matrix.arch }}-windows-static-md-rel
+      - name: Configure CMake
+        run: cmake -B build -A Win32
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+      - name: Build with CMake
+        run: cmake --build build --config Release
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: PicoTorrent-${{ matrix.arch }}-CI-binaries
-          path: |
-            build-${{ matrix.arch }}/Release/packages/PicoTorrent-*-${{ matrix.arch }}.exe
-            build-${{ matrix.arch }}/Release/packages/PicoTorrent-*-${{ matrix.arch }}.zip
-            build-${{ matrix.arch }}/Release/packages/PicoTorrent-*-${{ matrix.arch }}.symbols.zip
+          name: PicoTorrent-x86
+          path: build/Release/**
+
+  build-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up CMake
+        uses: actions/setup-cmake@v3
+
+      - name: Set up Visual Studio
+        uses: actions/setup-msbuild@v1
+
+      - name: Configure CMake
+        run: cmake -B build -A x64
+
+      - name: Build with CMake
+        run: cmake --build build --config Release
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoTorrent-x64
+          path: build/Release/**
